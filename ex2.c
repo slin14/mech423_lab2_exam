@@ -55,13 +55,13 @@ void display_LEDs(int display_byte) {
 }
 
 // [ex2] toggle the 0's in "display_byte" on LEDs
-void blink_LED_zeros(int display_byte) {
+void toggle_LED_zeros(int display_byte) {
 	P3OUT ^= (~display_byte & HIGHMASK); // toggle the 0s in upper 4 bits	
 	PJOUT ^= (~display_byte & LOWMASK);  // toggle the 0s in lower 4 bits	
 }
 
 // [ex2x] toggle the 1's in "display_byte" on LEDs
-void blink_LED_ones(int display_byte) {
+void toggle_LED_ones(int display_byte) {
     P3OUT ^= (display_byte & HIGHMASK); // toggle the 1s in upper 4 bits
     PJOUT ^= (display_byte & LOWMASK);  // toggle the 1s in lower 4 bits
 }
@@ -77,8 +77,8 @@ int main(void)
 	display_LEDs(LEDOUTPUT);
 
 	while(1) {
-	    blink_LED_zeros(LEDOUTPUT);  // toggle the zeros in LEDOUTPUT
-		//blink_LED_ones(LEDOUTPUT); // toggle the ones in LEDOUTPUT
+	    toggle_LED_zeros(LEDOUTPUT);  // toggle the zeros in LEDOUTPUT
+		//toggle_LED_ones(LEDOUTPUT); // toggle the ones in LEDOUTPUT
 		__delay_cycles(100000);      // delay to visibly blink LEDs
 	}
 	
