@@ -6,10 +6,21 @@ export CCS=`pwd`
 ```
 
 ```
-cd <repo_clon>
+cd <repo_clone>
+```
+
+create a single soft link
+```
 ln -s $CCS/ex1/main.c ex1.c
 ```
 
+create soft links for ex 1 to 10
+```
+for i in {1..10};
+do
+  ln -s $CCS/ex$i/main.c ex$i.c;
+done
+```
 
 # Linux
 ## soft link
