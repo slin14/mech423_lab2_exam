@@ -22,7 +22,7 @@ void setup_clocks() {
 			  SELS__DCOCLK ;    // DCO -> SMCLK
 }
 
-// divide SMCLK by 32
+// [ex1] divide SMCLK by 32
 void div_32_SMCLK() {
 	CSCTL3 |= DIVS__32;
 }

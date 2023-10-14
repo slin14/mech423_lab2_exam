@@ -28,7 +28,7 @@ void setup_clocks() {
 			  SELS__DCOCLK ;    // DCO -> SMCLK
 }
 
-// divide SMCLK by 32 - ex1
+// [ex1] divide SMCLK by 32 
 void div_32_SMCLK() {
 	CSCTL3 |= DIVS__32;
 }
@@ -54,6 +54,18 @@ void display_LEDs(int display_byte) {
 	PJOUT |= (display_byte & LOWMASK);  // display_byte lower 4 bits
 }
 
+// [ex2] toggle the 0's in "display_byte" on LEDs
+void blink_LED_zeros(int display_byte) {
+	P3OUT ^= (~display_byte & HIGHMASK); // toggle the 0s in upper 4 bits	
+	PJOUT ^= (~display_byte & LOWMASK);  // toggle the 0s in lower 4 bits	
+}
+
+// [ex2x] toggle the 1's in "display_byte" on LEDs
+void blink_LED_ones(int display_byte) {
+    P3OUT ^= (display_byte & HIGHMASK); // toggle the 1s in upper 4 bits
+    PJOUT ^= (display_byte & LOWMASK);  // toggle the 1s in lower 4 bits
+}
+
 /////////////////////////////////////////////////
 int main(void)
 {
@@ -65,7 +77,9 @@ int main(void)
 	display_LEDs(LEDOUTPUT);
 
 	while(1) {
-		;
+	    blink_LED_zeros(LEDOUTPUT);  // toggle the zeros in LEDOUTPUT
+		//blink_LED_ones(LEDOUTPUT); // toggle the ones in LEDOUTPUT
+		__delay_cycles(100000);      // delay to visibly blink LEDs
 	}
 	
 	return 0;
