@@ -8,6 +8,9 @@
  * output SMCLK on P3.4
  */
 
+/////////////////////////////////////////////////
+// FUNCTIONS
+
 // DCO (8 MHz) -> MCLK
 //             -> ACLK
 //             -> SMCLK
@@ -36,8 +39,8 @@ int main(void)
 {
 	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
 
-	setup_clocks();
-	div_32_SMCLK();
+	setup_clocks();  // 8 MHz DCO on MCLK, ACLK, SMCLK
+	div_32_SMCLK();  // divide SMCLK by 32 -> 250kHz
 	output_P3(BIT4); // output SMCLK on P3.4
 
 	while(1) {
