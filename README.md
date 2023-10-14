@@ -1,5 +1,5 @@
 # mech423_lab2_exam
-## soft link to CCS workspace
+## hard link to CCS workspace
 ```
 cd <ccs_workspace>
 export CCS=`pwd`
@@ -9,12 +9,12 @@ export CCS=`pwd`
 cd <repo_clone>
 ```
 
-create a single soft link
+create a single hard link
 ```
-ln -s $CCS/ex1/main.c ex1.c
+ln $CCS/ex1/main.c ex1.c
 ```
 
-create soft links for ex 1 to 10
+create hard links for ex 1 to 10
 ```
 for i in {1..10};
 do
@@ -23,6 +23,12 @@ done
 ```
 
 # Linux
+## hard link
+points a filename to data on a storage device
+```
+ln <file> <new_file_path>
+```
+
 ## soft link
 points a filename to another filename, which then points to information on a storage device
 ```
