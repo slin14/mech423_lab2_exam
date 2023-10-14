@@ -5,11 +5,16 @@
  */
 
 // PARAMETERS
-#define LEDOUTPUT 0b11010011
+#define LEDOUTPUT 0b00000001
 
 // CONSTANTS
-#define LOWMASK  0x0F
-#define HIGHMASK 0xF0
+#define LOWMASK  	0x0F
+#define HIGHMASK 	0xF0
+#define UART_CHAR0  'a'
+#define UART_INT_EN 0b1
+
+// VARIABLES
+volatile unsigned char rxByte = 0;
 
 /////////////////////////////////////////////////
 // FUNCTIONS
@@ -63,18 +68,52 @@ void toggle_LED_ones(int display_byte) {
     PJOUT ^= (display_byte & LOWMASK);  // toggle the 1s in lower 4 bits
 }
 
-// set up buttons S1 and S2 (inputs on P4.0 and P4.1)
+// [ex4x] turn ON the 1's in "display_byte" on LEDs
+void turn_ON_LED_ones(int display_byte) {
+    P3OUT |= (display_byte & HIGHMASK); // turn ON the 1s in upper 4 bits
+    PJOUT |= (display_byte & LOWMASK);  // turn ON the 1s in lower 4 bits
+}
+
+// [ex4x] turn OFF the 1's in "display_byte" on LEDs
+void turn_OFF_LED_ones(int display_byte) {
+    P3OUT &= ~(display_byte & HIGHMASK); // turn OFF the 1s in upper 4 bits
+    PJOUT &= ~(display_byte & LOWMASK);  // turn OFF the 1s in lower 4 bits
+}
+
+// [ex3] set up buttons S1 and S2 (inputs on P4.0 and P4.1)
 void setup_buttons_input() {
 	P4DIR &= ~(BIT0 + BIT1);  // P4.0 and P4.1 as input
 	P4REN |=  (BIT0 + BIT1);  // enable pullup
 	P4OUT |=  (BIT0 + BIT1);  // enable pullup
 }
 
-// enable buttons S1 and S2 interrupt (on P4.0 and P4.1)
+// [ex3] enable buttons S1 and S2 interrupt (on P4.0 and P4.1)
 void enable_buttons_interrupt() {
 	// on rising edge (when user lets go of button)
 	P4IES &= ~(BIT0 + BIT1); // rising edge
 	P4IE  |=  (BIT0 + BIT1); // enabel interrupt
+}
+
+// set up UART 9600 baud from 8MHz
+void setup_UART(int int_en) {
+	P2SEL0 &= ~(BIT0 + BIT1); // UART ports P2.0 and P2.1 // redundant
+    P2SEL1 |=  (BIT0 + BIT1); // UART ports P2.0 and P2.1 
+
+	UCA0CTLW0 |= UCSWRST;                   // Put the UART in software reset
+    UCA0CTLW0 |= UCSSEL__ACLK;              // Run the UART using ACLK
+  //UCA0CTLW0 |= UCSSEL__SMCLK;             // Run the UART using SMCLK
+    UCA0MCTLW = UCOS16 + UCBRF0 + 0x4900;   // Baud rate = 9600 from an 8 MHz clock
+    UCA0BRW = 52;                           // Baud rate = 9600 from an 8 MHz clock
+    UCA0CTLW0 &= ~UCSWRST;                  // release UART for operation
+
+	if (int_en)    UCA0IE |= UCRXIE;        // Enable UART Rx interrupt
+}
+
+// transmit "txByte" over UART
+void txUART(unsigned char txByte)
+{
+    while (!(UCA0IFG & UCTXIFG)); // wait until UART not transmitting
+    UCA0TXBUF = txByte;           // transmit txByte
 }
 
 /////////////////////////////////////////////////
@@ -90,28 +129,53 @@ int main(void)
 	setup_buttons_input();
 	enable_buttons_interrupt();
 
+	setup_UART(UART_INT_EN);   // set up UART with UART RX interrupt enabled
+  //setup_UART(~UART_INT_EN);  // set up UART with UART RX interrupt disabled
+
     /////////////////////////////////////////////////
     _EINT();         // enable global interrupt
 
 	while(1) {
-		;
+		// periodically transmit "UART_CHAR0"
+		__delay_cycles(100000);
+		txUART(UART_CHAR0);
 	}
 	
 	return 0;
 }
 
 #pragma vector = PORT4_VECTOR
-__interrupt void P4()
+__interrupt void P4_ISR()
 {
 	switch (P4IV) {
-		case P4IV_P4IFG0: // P4.0
+		case P4IV_P4IFG0: // P4.0 (SW1)
 	    	toggle_LED_zeros(LEDOUTPUT);  // toggle the zeros in LEDOUTPUT
+	      //turn_ON_LED_ones(LEDOUTPUT);  // turn ON the 1's in LEDOUTPUT
 			P4IFG &= ~BIT0; // clear IFG
 			break;
-		case P4IV_P4IFG1: // P4.1
+		case P4IV_P4IFG1: // P4.1 (SW2)
 	    	toggle_LED_ones(LEDOUTPUT);   // toggle the ones in LEDOUTPUT
+	      //turn_OFF_LED_ones(LEDOUTPUT); // turn OFF the 1's in LEDOUTPUT
 			P4IFG &= ~BIT1; // clear IFG
 			break;
 		default: break;
 	}
+}
+
+#pragma vector=USCI_A0_VECTOR
+__interrupt void UCA0RX_ISR()
+{
+    rxByte = UCA0RXBUF; // get the received byte from UART RX buffer
+
+	// transmit back the received byte
+	txUART(rxByte);                   // UART transmit
+
+	// transmit back rxByte + 1
+	txUART(rxByte + 1);               // UART transmit
+
+    // actions based on rxByte
+	if      (rxByte == 'j') turn_ON_LED_ones(LEDOUTPUT);  // turn ON the 1's in LEDOUTPUT
+    else if (rxByte == 'k') turn_OFF_LED_ones(LEDOUTPUT); // turn OFF the 1's in LEDOUTPUT
+
+	// UART RX IFG is self clearing
 }
