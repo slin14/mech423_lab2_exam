@@ -2,15 +2,20 @@
 
 /**
  * main.c - ex4 for exam
+ *
+ * UART periodically transmit "UART_CHAR0"
+ * UART ISR echos back "rxByte", then echos back "rxByte + 1"
+ * UART ISR turns "LEDOUTPUT" ON  if "rxByte" == 'j'
+ * UART ISR turns "LEDOUTPUT" OFF if "rxByte" == 'k'
  */
 
 // PARAMETERS
 #define LEDOUTPUT 0b00000001
+#define UART_CHAR0  'a'
 
 // CONSTANTS
 #define LOWMASK  	0x0F
 #define HIGHMASK 	0xF0
-#define UART_CHAR0  'a'
 #define UART_INT_EN 0b1
 
 // VARIABLES
