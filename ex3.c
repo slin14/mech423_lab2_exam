@@ -9,7 +9,7 @@
  */
 
 // PARAMETERS
-#define LEDOUTPUT 0b11010011
+#define LEDOUTPUT 0b10000000
 
 // CONSTANTS
 #define LOWMASK  0x0F
@@ -109,11 +109,11 @@ __interrupt void P4()
 {
 	switch (P4IV) {
 		case P4IV_P4IFG0: // P4.0
-	    	toggle_LED_zeros(LEDOUTPUT);  // toggle the zeros in LEDOUTPUT
+	    	toggle_LED_ones(LEDOUTPUT);   // toggle the ones in LEDOUTPUT
 			P4IFG &= ~BIT0; // clear IFG
 			break;
 		case P4IV_P4IFG1: // P4.1
-	    	toggle_LED_ones(LEDOUTPUT);   // toggle the ones in LEDOUTPUT
+	    	toggle_LED_zeros(LEDOUTPUT);  // toggle the zeros in LEDOUTPUT
 			P4IFG &= ~BIT1; // clear IFG
 			break;
 		default: break;
