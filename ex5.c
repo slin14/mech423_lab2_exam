@@ -140,9 +140,9 @@ void setup_timerB_UP_mode(int led_port) {
         P1SEL1 &= ~(BIT6 + BIT7); // select TB1.1 and TB1.2  // redundant
     }
 
-    TB1CTL |= TBSSEL__ACLK + // ACLK as clock source
+    TB1CTL |= TBSSEL__ACLK + // ACLK as clock source (8 MHz)
               MC__UP       + // Up mode
-              ID__8        ; // divide input clock by 8
+              ID__8        ; // divide input clock by 8 -> timer clk 1 MHz
     TB1CTL |= TBCLR;         // clr TBR, ensure proper reset of the timer divider logic
 
     TB1CCR0 = myTB1CCR0;     // value to count up to in UP mode
