@@ -10,6 +10,11 @@
 | TB1.2 | P1.7 | | |
 | *TB1.2* | *P3.5* | P1.3 | TA1.2 |
 
+## Circular Buffer
+count number of elements in circular buffer
+```
+echo "<serial data stream>" | wc -w
+```
 
 ## hard link to CCS workspace
 ```

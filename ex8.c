@@ -2,6 +2,9 @@
 
 /**
  * main.c - ex8 for exam
+ *
+ * ADC sample NTC and transmit over UART every 40 ms (250 Hz)
+ * Display NTC reading on LEDs 8 to 1
  */
 
 // PARAMETERS

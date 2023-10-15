@@ -2,6 +2,8 @@
 
 /**
  * main.c - ex7 for exam
+ *
+ * ADC read Ax, Ay, Az. Transmit over UART every 40 ms (25 Hz)
  */
 
 // PARAMETERS
