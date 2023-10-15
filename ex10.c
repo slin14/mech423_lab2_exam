@@ -3,6 +3,8 @@
 /**
  * main.c - ex10 for exam
  *
+ * [ex10] Process Message Packet
+ *
  * [ex9] Circular Buffer
  * enqueue over UART RX, dequeue if received "BUF_DQ_BYTE"
  *     if buf FULL,  transmit "BUF_FULL_BYTE"
@@ -56,6 +58,12 @@ volatile unsigned int  head = 0;
 volatile unsigned int  tail = 0;
 volatile unsigned int  i = 0;
 volatile unsigned int  dequeuedItem = 0;
+volatile unsigned char cmdByte = 0;
+volatile unsigned char data_L_Byte = 0;
+volatile unsigned char data_H_Byte = 0;
+volatile unsigned char escByte = 0;
+volatile unsigned int  data = 0;
+volatile unsigned int  byteState = 0;
 
 /////////////////////////////////////////////////
 // FUNCTIONS
