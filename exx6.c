@@ -1,13 +1,13 @@
 #include <msp430.h> 
 
 /**
- * main.c - ex6 for exam
+ * main.c - ex6 extra, with Timer A and B reversed
  *
- * use Timer A to measure time from rising edge to falling edge
- * of Timer B PWM outputs
+ * use Timer B to measure time from rising edge to falling edge
+ * of Timer A PWM outputs
  *
- * Timer A - CONTINUOUS mode, 1 MHz
- * TA0.1   - capture both edges, with ISR
+ * Timer B - CONTINUOUS mode, 1 MHz
+ * TB0.1   - capture both edges, with ISR | P1.4
  * TIMER0_A1_VECTOR ISR takes the time measurement
  *
  * [ex6 extra] transmit measurement over UART (upper byte, lower byte)
@@ -16,32 +16,31 @@
  * 1000  |      3 |    232 |   0x03 |   0xE8 |    1000
  *  500  |      1 |    244 |   0x01 |   0xF4 |     500
  *
- * [ex5] Timer B in UP mode, 1 MHz     (TB1CCR0 = 2000)
- * TB1.1   - PWM 500 Hz 50% duty cycle (TB1CCR1 = 1000)
- * TB1.2   - PWM 500 Hz 25% duty cycle (TB1CCR2 =  500)
+ * [ex5] Timer A in UP mode, 1 MHz     (TA1CCR0 = 2000)
+ * TA1.1   - PWM 500 Hz 50% duty cycle (TA1CCR1 = 1000) | P1.2
+ * TA1.2   - PWM 500 Hz 25% duty cycle (TA1CCR2 =  500) | P1.3
  */
 
 // PARAMETERS
 #define LEDOUTPUT        0b00000001
 #define UART_CHAR0       'a'
-#define myTB1CCR0        2000
-// myTB1CCR0 = 1 MHz / PWM frequency (Hz)
+#define myTA1CCR0        2000
+// myTA1CCR0 = 1 MHz / PWM frequency (Hz)
 
 // CONSTANTS
 #define LOWMASK         0x0F
 #define HIGHMASK        0xF0
 #define UART_INT_EN     0b1
-#define TIMERB_LED_PORT 0b1
 
 // VARIABLES (TO CHANGE)
-static const int myTB1CCR1 = 1000; // = duty cycle * myTB1CCR0
-static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
+static const int myTA1CCR1 = 1000; // = duty cycle * myTA1CCR0
+static const int myTA1CCR2 = 500;  // = duty cycle * myTA1CCR0
 
 // VARIABLES (TO BE USED)
 volatile unsigned char rxByte = 0;
 volatile unsigned int prevCap = 0; // volatile tells compiler the variable value can be modified at any point outside of this code
 volatile unsigned int cap = 0;
-volatile unsigned int measurement = 0; // time between rising and falling edge of TA0.1 input
+volatile unsigned int measurement = 0; // time between rising and falling edge of TB0.1 input
 
 
 /////////////////////////////////////////////////
@@ -58,7 +57,7 @@ void setup_clocks() {
               SELS__DCOCLK ;    // DCO -> SMCLK
 }
 
-// [ex1] divide SMCLK by 32 
+// [ex1] divide SMCLK by 32
 void div_32_SMCLK() {
     CSCTL3 |= DIVS__32;
 }
@@ -125,7 +124,7 @@ void enable_buttons_interrupt() {
 // set up UART 9600 baud from 8MHz
 void setup_UART(int int_en) {
     P2SEL0 &= ~(BIT0 + BIT1); // UART ports P2.0 and P2.1 // redundant
-    P2SEL1 |=  (BIT0 + BIT1); // UART ports P2.0 and P2.1 
+    P2SEL1 |=  (BIT0 + BIT1); // UART ports P2.0 and P2.1
 
     UCA0CTLW0 |= UCSWRST;                   // Put the UART in software reset
     UCA0CTLW0 |= UCSSEL__ACLK;              // Run the UART using ACLK
@@ -144,44 +143,36 @@ void txUART(unsigned char txByte)
     UCA0TXBUF = txByte;           // transmit txByte
 }
 
-// [ex5] setup Timer B Up Mode - counts up to "myTB1CCR0"
-// led_port    TB1.x    output port
-// 1           TB1.1    P3.4
-// 1           TB1.2    P3.5
-// 0           TB1.1    P1.6
-// 0           TB1.2    P1.7
-void setup_timerB_UP_mode(int led_port) {
-    if (led_port) {
-        P3DIR  |=  (BIT4 + BIT5); // P3.4 and P3.5 as output
-        P3SEL0 |=  (BIT4 + BIT5); // select TB1.1 and TB1.2
-        P3SEL1 &= ~(BIT4 + BIT5); // select TB1.1 and TB1.2  // redundant
-    } else {
-        P1DIR  |=  (BIT6 + BIT7); // P1.6 and P1.7 as output
-        P1SEL0 |=  (BIT6 + BIT7); // select TB1.1 and TB1.2
-        P1SEL1 &= ~(BIT6 + BIT7); // select TB1.1 and TB1.2  // redundant
-    }
+// [ex5] setup Timer A Up Mode - counts up to "myTA1CCR0"
+//             TA1.x    output port
+//             TA1.1    P1.2
+//             TA1.2    P1.3
+void setup_timerA_UP_mode() {
+    P1DIR  |=  (BIT2 + BIT3); // P1.2 and P1.3 as output
+    P1SEL0 |=  (BIT2 + BIT3); // select TA1.1 and TA1.2
+    P1SEL1 &= ~(BIT2 + BIT3); // select TA1.1 and TA1.2  // redundant
 
-    TB1CTL |= TBSSEL__ACLK + // ACLK as clock source (8 MHz)
+    TA1CTL |= TASSEL__ACLK + // ACLK as clock source (8 MHz)
               MC__UP       + // Up mode
               ID__8        ; // divide input clock by 8 -> timer clk 1 MHz
-    TB1CTL |= TBCLR;         // clr TBR, ensure proper reset of timer divider logic
+    TA1CTL |= TACLR;         // clr TAR, ensure proper reset of timer divider logic
 
-    TB1CCR0 = myTB1CCR0;     // value to count up to in UP mode
+    TA1CCR0 = myTA1CCR0;     // value to count up to in UP mode
 }
 
-// [ex6] setup Timer A CONTINUOUS Mode - counts up to TxR (counter length set by CNTL)
-void setup_timerA_CONT_mode() {
-	// configure P1.0 as input to timerA TA0.1
-    P1DIR &= ~BIT0;
-    P1SEL1 &= ~BIT0;
-    P1SEL0 |= BIT0;
+// [ex6] setup Timer B CONTINUOUS Mode - counts up to TxR (counter length set by CNTL)
+void setup_timerB_CONT_mode() {
+    // configure P1.4 as input to timerB TB0.1
+    P1DIR  &= ~BIT4;
+    P1SEL1 &= ~BIT4;
+    P1SEL0 |=  BIT4;
 
-    // configure Timer A
-    TA0CTL   = TASSEL__ACLK   + // ACLK as clock source (8 MHz)
+    // configure Timer B
+    TB0CTL   = TBSSEL__ACLK   + // ACLK as clock source (8 MHz)
                MC__CONTINUOUS + // Continuous mode
                ID__8          + // divide input clock by 8 -> timer clk 1 MHz
-               TACLR          ; // Timer A counter clear, ensure proper reset of timer divider logic
-    // Note:   TAIE (overflow interrupt is NOT enabled)
+               TBCLR          ; // Timer B counter clear, ensure proper reset of timer divider logic
+    // Note:   TBIE (overflow interrupt is NOT enabled)
 }
 
 // [ex6x] setup Timer B CONTINUOUS Mode - counts up to TxR
@@ -195,37 +186,36 @@ int main(void)
     setup_clocks();  // 8 MHz DCO on MCLK, ACLK, SMCLK
 
     /////////////////////////////////////////////////
-    // [ex5] Timer B - 1 MHz, UP mode - counts up to "myTB1CCR0"
-    setup_timerB_UP_mode(TIMERB_LED_PORT);  // TB1.1 and TB1.2 on P3.4 and P3.5
-  //setup_timerB_UP_mode(~TIMERB_LED_PORT); // TB1.1 and TB1.2 on P1.6 and P1.7
+    // [ex5] Timer A - 1 MHz, UP mode - counts up to "myTA1CCR0"
+    setup_timerA_UP_mode();  // TA1.1 and TA1.2 on P1.2 and P1.3
 
-    // generate PWM with "DUTY_CYCLE_TB1_1" % duty cycle on TB1.1
-    TB1CCTL1 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
-    TB1CCR1 = myTB1CCR1;
+    // generate PWM with "DUTY_CYCLE_TA1_1" % duty cycle on TA1.1
+    TA1CCTL1 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
+    TA1CCR1 = myTA1CCR1;
 
-    // generate PWM with "DUTY_CYCLE_TB1_2" % duty cycle on TB1.2
-    TB1CCTL2 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
-    TB1CCR2 = myTB1CCR2;
+    // generate PWM with "DUTY_CYCLE_TA1_2" % duty cycle on TA1.2
+    TA1CCTL2 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
+    TA1CCR2 = myTA1CCR2;
 
     /////////////////////////////////////////////////
-	// [ex6] Timer A - 1 MHz, CONTINUOUS mode - counts up to TBxR
-	setup_timerA_CONT_mode(); // P1.0 input to timerA TA0.1
+    // [ex6] Timer B - 1 MHz, CONTINUOUS mode - counts up to TBxR
+    setup_timerB_CONT_mode(); // P1.4 input to timerB TB0.1
 
-	// configure TA0.1 - capture both edges, with ISR
-    TA0CCTL1 |= CM_3  + // Capture mode: 1 - both edges
+    // configure TB0.1 - capture both edges, with ISR
+    TB0CCTL1 |= CM_3  + // Capture mode: 1 - both edges
                 CAP   + // Capture mode: 1
                 SCS   + // Capture synchronize to timer clk (recommended)
                 CCIE  + // Capture/compare interrupt enable
                 CCIS_0; // Capture input select: 0 - CCIxA
-	
-	// [ex6x]
-	setup_UART(~UART_INT_EN);  // set up UART with UART RX interrupt disabled
+
+    // [ex6x]
+    setup_UART(~UART_INT_EN);  // set up UART with UART RX interrupt disabled
 
     /////////////////////////////////////////////////
     _EINT();         // enable global interrupt
 
     while(1) {
-        // [ex6x] periodically transmit TA0.1 captured value over UART
+        // [ex6x] periodically transmit TB0.1 captured value over UART
         __delay_cycles(100000);
         txUART(measurement>>8);
         txUART(measurement);
@@ -234,22 +224,22 @@ int main(void)
     return 0;
 }
 
-// ISR for capture from TA0.1
-// [ex6] overflow is NOT enabled, so this will NOT fire when TAR overflows
-#pragma vector=TIMER0_A1_VECTOR
-__interrupt void timerA(void)
+// ISR for capture from TB0.1
+// [ex6] overflow is NOT enabled, so this will NOT fire when TBR overflows
+#pragma vector=TIMER0_B1_VECTOR
+__interrupt void timerB(void)
 {
-    if (TA0IV & TA0IV_TACCR1){ // TA0CCR1_CCIFG is set
-        cap = TA0CCR1;
-        if(!(TA0CCTL1 & CCI)){ // current output is low (it was previously high)
-			// save the measurement (time now - starting time)
+    if (TB0IV & TB0IV_TBCCR1){ // TB0CCR1_CCIFG is set
+        cap = TB0CCR1;
+        if(!(TB0CCTL1 & CCI)){ // current output is low (it was previously high)
+            // save the measurement (time now - starting time)
             measurement = cap - prevCap; // time between rising and falling edge
-            // TA0CCR2 = measurement; // save to a register (trying to see it in the debugger)
+            // TB0CCR2 = measurement; // save to a register (trying to see it in the debugger)
         }
-        else if (TA0CCTL1 & CCI) { // current output is high (it was previously low)
+        else if (TB0CCTL1 & CCI) { // current output is high (it was previously low)
             prevCap = cap; // reset the measurement starting time
         }
-    	TA0CCTL1 &= ~CCIFG; // clear IFG
+        TB0CCTL1 &= ~CCIFG; // clear IFG
     }
 }
 

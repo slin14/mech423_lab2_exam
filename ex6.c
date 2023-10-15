@@ -7,7 +7,7 @@
  * of Timer B PWM outputs
  *
  * Timer A - CONTINUOUS mode, 1 MHz
- * TA0.1   - capture both edges, with ISR
+ * TA0.1   - capture both edges, with ISR | P1.0
  * TIMER0_A1_VECTOR ISR takes the time measurement
  *
  * [ex6 extra] transmit measurement over UART (upper byte, lower byte)
@@ -16,9 +16,9 @@
  * 1000  |      3 |    232 |   0x03 |   0xE8 |    1000
  *  500  |      1 |    244 |   0x01 |   0xF4 |     500
  *
- * [ex5] Timer B in UP mode, 1 MHz     (TB1CCR0 = 2000)
- * TB1.1   - PWM 500 Hz 50% duty cycle (TB1CCR1 = 1000)
- * TB1.2   - PWM 500 Hz 25% duty cycle (TB1CCR2 =  500)
+ * [ex5] Timer B in UP mode, 1 MHz     (TB1CCR0 = 2000) |  0b1 |  0b0
+ * TB1.1   - PWM 500 Hz 50% duty cycle (TB1CCR1 = 1000) | P3.4 | P1.6
+ * TB1.2   - PWM 500 Hz 25% duty cycle (TB1CCR2 =  500) | P3.5 | P1.7
  */
 
 // PARAMETERS
