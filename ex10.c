@@ -329,6 +329,80 @@ void printBufUART()
     }
 }
 
+// [ex10] process message packet and execute commands
+void process_msg_packet() {
+    // loop over buffer contents
+    for (i = tail; i != head; i = (i + 1) % BUF_SIZE) {
+        while (!(UCA0IFG & UCTXIFG)); // wait until UART not transmitting
+        switch(byteState) {
+            case 0:
+                if (dequeuedItem == MSG_START_BYTE) byteState = 1;
+                break;
+            case 1:
+                cmdByte = dequeuedItem;
+                byteState = 2;
+                break;
+            case 2:
+                data_H_Byte = dequeuedItem;
+                byteState = 3;
+                break;
+            case 3:
+                data_L_Byte = dequeuedItem;
+                byteState = 4;
+                break;
+            case 4:
+                escByte = dequeuedItem;
+                byteState = 0;
+                // entire packet received, process packet
+
+                // revert modified data using escByte
+                switch(escByte) {
+                    case 0x01:
+                        data_L_Byte = MSG_START_BYTE;
+                        break;
+                    case 0x02:
+                        data_H_Byte = MSG_START_BYTE;
+                        break;
+                    case 0x03:
+                        data_L_Byte = MSG_START_BYTE;
+                        data_H_Byte = MSG_START_BYTE;
+                        break;
+                    default:
+                        break;
+                } // switch (escByte)
+
+                // combine data_H and data_L Bytes
+                data = data_H_Byte << 8 | data_L_Byte;
+
+                // execute commands
+                switch(cmdByte) {
+                    case FREQ_CMD_BYTE: // cmd 1: set Timer B CCR0 (period)
+                        TB1CCR0 = data;
+                        break;
+                    case LEDS_CMD_BYTE: // cmd 2: display data_L_Byte on LEDs
+                        byteDisplayLED(data_L_Byte);
+                        break;
+                    case DUTY_CMD_BYTE: // cmd 3: set Timer B CCR1 (duty cycle)
+                        TB1CCR1 = data;
+                        break;
+                    default:
+                        break;
+                } // switch (cmdByte)
+
+                // dequeue the processed message packet
+                dequeuedItem = dequeue();
+                dequeuedItem = dequeue();
+                dequeuedItem = dequeue();
+                dequeuedItem = dequeue();
+                dequeuedItem = dequeue();
+
+                break;
+            default:
+                break;
+        } // switch (byteState)
+    } // for loop over buf contents
+}
+
 /////////////////////////////////////////////////
 int main(void)
 {
@@ -355,76 +429,7 @@ int main(void)
     _EINT();         // enable global interrupt
 
     while(1) {
-		// [ex10] loop over buffer contents
-		for (i = tail; i != head; i = (i + 1) % BUF_SIZE) {
-			while (!(UCA0IFG & UCTXIFG)); // wait until UART not transmitting
-			switch(byteState) {
-				case 0:
-					if (dequeuedItem == MSG_START_BYTE) byteState = 1;
-					break;
-				case 1:
-					cmdByte = dequeuedItem;
-					byteState = 2;
-					break;
-				case 2:
-					data_H_Byte = dequeuedItem;
-					byteState = 3;
-					break;
-				case 3:
-					data_L_Byte = dequeuedItem;
-					byteState = 4;
-					break;
-				case 4:
-					escByte = dequeuedItem;
-					byteState = 0;
-					// entire packet received, process packet
-
-					// revert modified data using escByte
-					switch(escByte) {
-						case 0x01:
-							data_L_Byte = MSG_START_BYTE;
-							break;
-						case 0x02:
-							data_H_Byte = MSG_START_BYTE;
-							break;
-						case 0x03:
-							data_L_Byte = MSG_START_BYTE;
-							data_H_Byte = MSG_START_BYTE;
-							break;
-						default:
-							break;
-					} // switch (escByte)
-
-					// combine data_H and data_L Bytes
-					data = data_H_Byte << 8 | data_L_Byte;
-
-					// execute commands
-					switch(cmdByte) {
-						case FREQ_CMD_BYTE: // cmd 1: set Timer B CCR0 (period)
-						    TB1CCR0 = data;
-							break;
-						case LEDS_CMD_BYTE: // cmd 2: display data_L_Byte on LEDs
-						    byteDisplayLED(data_L_Byte);
-							break;
-						case DUTY_CMD_BYTE: // cmd 3: set Timer B CCR1 (duty cycle)
-						    TB1CCR1 = data;
-							break;
-						default:
-							break;
-					} // switch (cmdByte)
-
-					// dequeue the processed message packet
-					dequeuedItem = dequeue();
-					dequeuedItem = dequeue();
-					dequeuedItem = dequeue();
-					dequeuedItem = dequeue();
-					dequeuedItem = dequeue();
-
-					break;
-				default:
-					break;
-			} // switch (byteState)
-	    } // for loop over buf contents
+        ;
     } // infinite loop
 
     return 0;
@@ -503,4 +508,26 @@ __interrupt void UCA0RX_ISR()
     rxByte = UCA0RXBUF; // get the received byte from UART RX buffer
 
 	// [ex9] circular buffer
-	if (rxByte == BUF_DQ_BYTE) { //
+	if (rxByte == BUF_DQ_BYTE) { // dequeue if receive a carriage return (ASCII 13)
+		dequeuedItem = dequeue();
+	} 
+	else {
+		enqueue(rxByte);
+	}
+	printBufUART(); // debug
+
+	// [ex10] process msg packet and execute commands
+	process_msg_packet();
+
+	//// [ex4] echo rxByte, rxBtye + 1
+    //// transmit back the received byte
+    //txUART(rxByte);                   // UART transmit
+    //// transmit back rxByte + 1
+    //txUART(rxByte + 1);               // UART transmit
+
+    //// [ex4] turn LED ON if rxByte == 'j', OFF if rxByte == 'k'
+    //if      (rxByte == 'j') turn_ON_LED_ones(LEDOUTPUT);  // turn ON the 1's in LEDOUTPUT
+    //else if (rxByte == 'k') turn_OFF_LED_ones(LEDOUTPUT); // turn OFF the 1's in LEDOUTPUT
+
+    // UART RX IFG is self clearing
+}
