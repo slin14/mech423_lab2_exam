@@ -251,11 +251,7 @@ int main(void)
     _EINT();         // enable global interrupt
 
     while(1) {
-		// [ex7]
-		txUART(datapacket);
-        txUART(ax);
-        txUART(ay);
-        txUART(az);
+		;
     }
 
     return 0;
@@ -265,13 +261,20 @@ int main(void)
 #pragma vector = TIMER0_A0_VECTOR
 __interrupt void timerA0()
 {
-    // [ex7] sample accelerometer Ax, Ay, Az
+    // [ex7] every 40 ms (250 Hz)
+    // sample accelerometer Ax, Ay, Az
     ax = adcReadChannel(X_CH) >> 2;
     ay = adcReadChannel(Y_CH) >> 2;
     az = adcReadChannel(Z_CH) >> 2;
 
     //// [ex8] sample NTC
     //temp = adcReadChannel(ADC10INCH_4);
+
+    // [ex7] transmit 255, Ax, Ay, Az over UART
+    txUART(datapacket);
+    txUART(ax);
+    txUART(ay);
+    txUART(az);
 
     TA0CCTL0 &= ~CCIFG; // clear IFG
 }
