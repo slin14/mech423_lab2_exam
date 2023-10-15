@@ -1,4 +1,14 @@
 # mech423_lab2_exam
+## Timers
+
+TB0.1 | P1.4 || *P1.0* | *TA0.1*
+TB0.2 | P1.5 || P1.1 | TA0.2
+TB1.1 | P1.6 ||
+*TB1.1* | *P3.4* || P1.2 | TA1.1
+TB1.2 | P1.7 ||
+*TB1.2* | *P3.5* || P1.3 | TA1.2
+
+
 ## hard link to CCS workspace
 ```
 cd <ccs_workspace>
