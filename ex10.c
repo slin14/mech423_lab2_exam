@@ -3,7 +3,17 @@
 /**
  * main.c - ex10 for exam
  *
- * [ex10] Process Message Packet
+ * [ex10] Process Message Packet (packet size = byte)
+ * PC TX requirements: need 5 consecutive packets
+ *
+ * | MSG_START_BYTE | cmdByte       | data_H_Byte | data_L_Byte | escByte | data_modified |
+ * |----------------|---------------|-------------|-------------|---------|---------------|
+ * | 255            | FREQ_CMD_BYTE |             |             |         |               |
+ * | 255            | LEDS_CMD_BYTE |             |             |         |               |
+ * | 255            | DUTY_CMD_BYTE |             |             |         |               |
+ * | 255            |               |             | 0x00        | 0x01    | 0x..FF        |
+ * | 255            |               | 0x00        |             | 0x02    | 0xFF..        |
+ * | 255            |               | 0x00        | 0x00        | 0x03    | 0xFFFF        |
  *
  * [ex9] Circular Buffer
  * enqueue over UART RX, dequeue if received "BUF_DQ_BYTE"
@@ -39,9 +49,12 @@ static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
 // VARIABLES (CONSTANTS)
 static const unsigned char datapacket = 255;
 static const unsigned char BUF_DQ_BYTE = 13;
-static const unsigned char BUF_EMPTY_BYTE = 0;
-static const unsigned char BUF_FULL_BYTE = 255;
-
+static const unsigned char BUF_EMPTY_BYTE = 0;   // buf error indicator 
+static const unsigned char BUF_FULL_BYTE  = 255; // buf error indicator 
+static const unsigned char MSG_START_BYTE = 255;
+static const unsigned char FREQ_CMD_BYTE = 0x01; // msg cmd
+static const unsigned char LEDS_CMD_BYTE = 0x02; // msg cmd
+static const unsigned char DUTY_CMD_BYTE = 0x03; // msg cmd
 
 // VARIABLES (TO BE USED)
 volatile unsigned char rxByte = 0;
@@ -59,8 +72,8 @@ volatile unsigned int  tail = 0;
 volatile unsigned int  i = 0;
 volatile unsigned int  dequeuedItem = 0;
 volatile unsigned char cmdByte = 0;
-volatile unsigned char data_L_Byte = 0;
 volatile unsigned char data_H_Byte = 0;
+volatile unsigned char data_L_Byte = 0;
 volatile unsigned char escByte = 0;
 volatile unsigned int  data = 0;
 volatile unsigned int  byteState = 0;
@@ -141,6 +154,17 @@ void enable_buttons_interrupt() {
     // on rising edge (when user lets go of button)
     P4IES &= ~(BIT0 + BIT1); // rising edge
     P4IE  |=  (BIT0 + BIT1); // enabel interrupt
+}
+
+// [ex10x] display a byte in binary on LEDs
+void byteDisplayLED(unsigned char in)
+{
+    char high = in & ~LOWMASK;
+    char low = in & ~HIGHMASK;
+    PJOUT &= ~LOWMASK;
+    P3OUT &= ~HIGHMASK;
+    PJOUT |= low;
+    P3OUT |= high;
 }
 
 // set up UART 9600 baud from 8MHz
@@ -308,25 +332,103 @@ void printBufUART()
 /////////////////////////////////////////////////
 int main(void)
 {
-    WDTCTL = WDTPW | WDTHOLD;   // stop watchdog timer
+    WDTCTL = WDTPW | WDTHOLD;  // stop watchdog timer
 
-    setup_clocks();  // 8 MHz DCO on MCLK, ACLK, SMCLK
+    setup_clocks();            // 8 MHz DCO on MCLK, ACLK, SMCLK
 	setup_UART(UART_INT_EN);   // set up UART with UART RX interrupt enabled
 
 	setup_LEDs();
 
-	setup_buttons_input();
+	// setup Timer B [ex5] to output PWM on P1.6 and P1.7
+	setup_timerB_UP_mode(~TIMERB_LED_PORT); // TB1.1 and TB1.2 on P1.6 and P1.7
+
+	// initialize PWM outputs to default: 500 Hz, 50% duty TB1.1, 25% duty TB1.2
+	TB1CCTL1 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
+    TB1CCR1 = myTB1CCR1;
+    TB1CCTL2 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
+    TB1CCR2 = myTB1CCR2;
+
+	//setup_buttons_input();
 	//enable_buttons_interrupt();
 
     /////////////////////////////////////////////////
     _EINT();         // enable global interrupt
 
     while(1) {
-		;
-    }
+		// [ex10] loop over buffer contents
+		for (i = tail; i != head; i = (i + 1) % BUF_SIZE) {
+			while (!(UCA0IFG & UCTXIFG)); // wait until UART not transmitting
+			switch(byteState) {
+				case 0:
+					if (dequeuedItem == MSG_START_BYTE) byteState = 1;
+					break;
+				case 1:
+					cmdByte = dequeuedItem;
+					byteState = 2;
+					break;
+				case 2:
+					data_H_Byte = dequeuedItem;
+					byteState = 3;
+					break;
+				case 3:
+					data_L_Byte = dequeuedItem;
+					byteState = 4;
+					break;
+				case 4:
+					escByte = dequeuedItem;
+					byteState = 0;
+					// entire packet received, process packet
+
+					// revert modified data using escByte
+					switch(escByte) {
+						case 0x01:
+							data_L_Byte = MSG_START_BYTE;
+							break;
+						case 0x02:
+							data_H_Byte = MSG_START_BYTE;
+							break;
+						case 0x03:
+							data_L_Byte = MSG_START_BYTE;
+							data_H_Byte = MSG_START_BYTE;
+							break;
+						default:
+							break;
+					} // switch (escByte)
+
+					// combine data_H and data_L Bytes
+					data = data_H_Byte << 8 | data_L_Byte;
+
+					// execute commands
+					switch(cmdByte) {
+						case FREQ_CMD_BYTE: // cmd 1: set Timer B CCR0 (period)
+						    TB1CCR0 = data;
+							break;
+						case LEDS_CMD_BYTE: // cmd 2: display data_L_Byte on LEDs
+						    byteDisplayLED(data_L_Byte);
+							break;
+						case DUTY_CMD_BYTE: // cmd 3: set Timer B CCR1 (duty cycle)
+						    TB1CCR1 = data;
+							break;
+						default:
+							break;
+					} // switch (cmdByte)
+
+					// dequeue the processed message packet
+					dequeuedItem = dequeue();
+					dequeuedItem = dequeue();
+					dequeuedItem = dequeue();
+					dequeuedItem = dequeue();
+					dequeuedItem = dequeue();
+
+					break;
+				default:
+					break;
+			} // switch (byteState)
+	    } // for loop over buf contents
+    } // infinite loop
 
     return 0;
-}
+} // end main
 /////////////////////////////////////////////////
 // ISRs
 
@@ -401,24 +503,4 @@ __interrupt void UCA0RX_ISR()
     rxByte = UCA0RXBUF; // get the received byte from UART RX buffer
 
 	// [ex9] circular buffer
-	if (rxByte == BUF_DQ_BYTE) { // dequeue if receive a carriage return (ASCII 13)
-		dequeuedItem = dequeue();
-	} 
-	else {
-		enqueue(rxByte);
-	}
-	printBufUART(); // debug
-
-
-	//// [ex4] echo rxByte, rxBtye + 1
-    //// transmit back the received byte
-    //txUART(rxByte);                   // UART transmit
-    //// transmit back rxByte + 1
-    //txUART(rxByte + 1);               // UART transmit
-
-    //// [ex4] turn LED ON if rxByte == 'j', OFF if rxByte == 'k'
-    //if      (rxByte == 'j') turn_ON_LED_ones(LEDOUTPUT);  // turn ON the 1's in LEDOUTPUT
-    //else if (rxByte == 'k') turn_OFF_LED_ones(LEDOUTPUT); // turn OFF the 1's in LEDOUTPUT
-
-    // UART RX IFG is self clearing
-}
+	if (rxByte == BUF_DQ_BYTE) { //
