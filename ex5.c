@@ -2,6 +2,15 @@
 
 /**
  * main.c - ex5 for exam
+ *
+ * [ex5] Timer B in UP mode, 1 MHz     (TB1CCR0 = 2000)
+ * TB1.1  -> PWM 500 Hz 50% duty cycle (TB1CCR1 = 1000)
+ * TB1.2  -> PWM 500 Hz 25% duty cycle (TB1CCR2 =  500)
+ *
+ * [ex5 extra] setup_timerB_UP_mode(<select_out_port>)
+ * TIMERB_LED_PORT |  0b1 |  0b0
+ * TB1.1           | P3.4 | P1.6
+ * TB1.2           | P3.5 | P1.7
  */
 
 // PARAMETERS

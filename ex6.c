@@ -2,6 +2,23 @@
 
 /**
  * main.c - ex6 for exam
+ *
+ * use Timer A to measure time from rising edge to falling edge
+ * of Timer B PWM outputs
+ *
+ * Timer A - CONTINUOUS mode, 1 MHz
+ * TA0.1   - capture both edges, with ISR
+ * TIMER0_A1_VECTOR ISR takes the time measurement
+ *
+ * [ex6 extra] transmit measurement over UART (upper byte, lower byte)
+ * TB1.x |     DECIMAL     |       HEX       | MEASUREMENT
+ * CCRx  | upperB | lowerB | upperB | lowerB | 16-bit int
+ * 1000  |      3 |    232 |   0x03 |   0xE8 |    1000
+ *  500  |      1 |    244 |   0x01 |   0xF4 |     500
+ *
+ * [ex5] Timer B in UP mode, 1 MHz     (TB1CCR0 = 2000)
+ * TB1.1   - PWM 500 Hz 50% duty cycle (TB1CCR1 = 1000)
+ * TB1.2   - PWM 500 Hz 25% duty cycle (TB1CCR2 =  500)
  */
 
 // PARAMETERS
@@ -24,7 +41,7 @@ static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
 volatile unsigned char rxByte = 0;
 volatile unsigned int prevCap = 0; // volatile tells compiler the variable value can be modified at any point outside of this code
 volatile unsigned int cap = 0;
-volatile unsigned int measurement = 0;
+volatile unsigned int measurement = 0; // time between rising and falling edge of TA0.1 input
 
 
 /////////////////////////////////////////////////
@@ -218,21 +235,22 @@ int main(void)
 }
 
 // ISR for capture from TA0.1
-// note: overflow is NOT enabled, so this will NOT fire when TAR overflows
+// [ex6] overflow is NOT enabled, so this will NOT fire when TAR overflows
 #pragma vector=TIMER0_A1_VECTOR
 __interrupt void timerA(void)
 {
     if (TA0IV & TA0IV_TACCR1){ // TA0CCR1_CCIFG is set
         cap = TA0CCR1;
         if(!(TA0CCTL1 & CCI)){ // current output is low (it was previously high)
-            measurement = cap - prevCap; // save the measurement (time now - starting time)
+			// save the measurement (time now - starting time)
+            measurement = cap - prevCap; // time between rising and falling edge
             // TA0CCR2 = measurement; // save to a register (trying to see it in the debugger)
         }
         else if (TA0CCTL1 & CCI) { // current output is high (it was previously low)
             prevCap = cap; // reset the measurement starting time
         }
+    	TA0CCTL1 &= ~CCIFG; // clear IFG
     }
-    TA0CCTL1 &= ~CCIFG; // clear IFG
 }
 
 #pragma vector = PORT4_VECTOR
