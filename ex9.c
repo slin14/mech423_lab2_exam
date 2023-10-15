@@ -4,6 +4,10 @@
  * main.c - ex9 for exam
  *
  * Circular Buffer
+ * enqueue over UART RX, dequeue if received "BUF_DQ_BYTE"
+ *     if buf FULL,  transmit "BUF_FULL_BYTE"
+ *     if buf EMPTY, transmit "BUF_EMPTY_BYTE"
+ * [ex9 debug] print circular buffer contents over UART
  */
 
 // PARAMETERS
@@ -31,8 +35,11 @@ static const int myTB1CCR1 = 1000; // = duty cycle * myTB1CCR0
 static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
 
 // VARIABLES (CONSTANTS)
-unsigned char datapacket = 255;
-unsigned char carriage_ret_byte = 13;
+static const unsigned char datapacket = 255;
+static const unsigned char BUF_DQ_BYTE = 13;
+static const unsigned char BUF_EMPTY_BYTE = 0;
+static const unsigned char BUF_FULL_BYTE = 255;
+
 
 // VARIABLES (TO BE USED)
 volatile unsigned char rxByte = 0;
@@ -261,7 +268,7 @@ void displayTempOnLEDs()
 void enqueue(int val)
 {
     if ((head + 1) % BUF_SIZE == tail) { // buffer FULL (head + 1 == tail)
-        txUART(255); // Error: buffer full
+        txUART(BUF_FULL_BYTE); // Error: buffer full
     }
     else {
         buf[head] = val; // enqueue
@@ -273,7 +280,7 @@ void enqueue(int val)
 int dequeue(void) {
     int result = 0;
     if (head == tail) { // buffer empty
-        txUART(0); // Error: buffer empty
+        txUART(BUF_EMPTY_BYTE); // Error: buffer empty
     }
     else {
         result = buf[tail]; // dequeue
@@ -285,11 +292,9 @@ int dequeue(void) {
 // debugging: print circular buffer contents over UART
 void printBufUART()
 {
-    //txUART(0); // start marker
     for (i = tail; i != head; i = (i + 1) % BUF_SIZE) {
         txUART(buf[i]);
     }
-    //txUART(0); // end marker
 }
 
 /////////////////////////////////////////////////
@@ -388,7 +393,7 @@ __interrupt void UCA0RX_ISR()
     rxByte = UCA0RXBUF; // get the received byte from UART RX buffer
 
 	// [ex9] circular buffer
-	if (rxByte == carriage_ret_byte) { // dequeue if receive a carriage return (ASCII 13)
+	if (rxByte == BUF_DQ_BYTE) { // dequeue if receive a carriage return (ASCII 13)
 		dequeuedItem = dequeue();
 	} 
 	else {
@@ -407,4 +412,5 @@ __interrupt void UCA0RX_ISR()
     //if      (rxByte == 'j') turn_ON_LED_ones(LEDOUTPUT);  // turn ON the 1's in LEDOUTPUT
     //else if (rxByte == 'k') turn_OFF_LED_ones(LEDOUTPUT); // turn OFF the 1's in LEDOUTPUT
 
- 
+    // UART RX IFG is self clearing
+}

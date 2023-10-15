@@ -13,7 +13,7 @@
 ## Circular Buffer
 count number of elements in circular buffer
 ```
-echo "<serial data stream>" | wc -w
+echo "<serial_data_stream>" | wc -w
 ```
 
 ## hard link to CCS workspace
