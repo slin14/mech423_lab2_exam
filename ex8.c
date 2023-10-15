@@ -267,7 +267,7 @@ int main(void)
 	setup_buttons_input();
 	enable_buttons_interrupt();
 	__delay_cycles(100000);
-	tempThresh = adcReadChannel(ADC10INCH_4);
+	tempThresh = adcReadChannel(ADC10INCH_4); // no right shift to incr resolution
 
     /////////////////////////////////////////////////
     _EINT();         // enable global interrupt
@@ -331,7 +331,7 @@ __interrupt void P4_ISR()
             //turn_ON_LED_ones(LEDOUTPUT);  // turn ON the 1's in LEDOUTPUT
 
             // [ex8] S1 as temperature calibration button
-            tempThresh = adcReadChannel(NTC_CH);
+            tempThresh = adcReadChannel(NTC_CH); // no right shift to incr resolution
 
             P4IFG &= ~BIT0; // clear IFG
             break;
