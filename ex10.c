@@ -4,7 +4,8 @@
  * main.c - ex10 for exam
  *
  * [ex10] Process Message Packet (packet size = byte)
- * PC TX requirements: need 5 consecutive packets
+ * PC TX requirements: need MSG_SIZE=5 consecutive packets
+ * freq reading on P1.6
  *
  * | MSG_START_BYTE | cmdByte       | data_H_Byte | data_L_Byte | escByte | data_modified |
  * |----------------|---------------|-------------|-------------|---------|---------------|
@@ -23,13 +24,14 @@
  */
 
 // PARAMETERS
-#define LEDOUTPUT        0b00000001
+#define LEDOUTPUT        0b11111111
 #define UART_CHAR0       'a'
 // myTB1CCR0 = 1 MHz / PWM frequency (Hz)
 #define myTB1CCR0        2000
 // milliseconds per timer interrupt (freq = 1000/TIMER_MILLISEC Hz) 
-#define TIMER_MILLISEC   40
+//#define TIMER_MILLISEC   40
 #define BUF_SIZE         50
+#define MSG_SIZE         5
 
 // CONSTANTS
 #define LOWMASK         0x0F
@@ -45,6 +47,7 @@
 // VARIABLES (PARAMETERS)
 static const int myTB1CCR1 = 1000; // = duty cycle * myTB1CCR0
 static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
+static const int myTA0CCR0 = 500;  // = TIMER_MILLISEC * 1000 - 1;
 
 // VARIABLES (CONSTANTS)
 static const unsigned char datapacket = 255;
@@ -66,17 +69,21 @@ volatile unsigned char ayByte = 0;
 volatile unsigned char azByte = 0;
 volatile unsigned int  temp = 0;
 volatile unsigned int  tempThresh = 194;
-volatile unsigned int  buf[BUF_SIZE];
+volatile unsigned char buf[BUF_SIZE];
 volatile unsigned int  head = 0;
 volatile unsigned int  tail = 0;
 volatile unsigned int  i = 0;
 volatile unsigned int  dequeuedItem = 0;
+volatile unsigned char dequeuedByte = 0;
+volatile unsigned char startByte = 0;
 volatile unsigned char cmdByte = 0;
 volatile unsigned char data_H_Byte = 0;
 volatile unsigned char data_L_Byte = 0;
 volatile unsigned char escByte = 0;
 volatile unsigned int  data = 0;
 volatile unsigned int  byteState = 0;
+//volatile unsigned int  msg_byte_count = 0;
+volatile unsigned int  packetReceivedFlag = 0;
 
 /////////////////////////////////////////////////
 // FUNCTIONS
@@ -196,7 +203,7 @@ void txUART(unsigned char txByte)
 // 0           TB1.1    P1.6
 // 0           TB1.2    P1.7
 void setup_timerB_UP_mode(int led_port) {
-    if (led_port) {
+    if (led_port == TIMERB_LED_PORT) {
         P3DIR  |=  (BIT4 + BIT5); // P3.4 and P3.5 as output
         P3SEL0 |=  (BIT4 + BIT5); // select TB1.1 and TB1.2
         P3SEL1 &= ~(BIT4 + BIT5); // select TB1.1 and TB1.2  // redundant
@@ -275,7 +282,7 @@ unsigned int adcReadChannel(int channel)
 void timerA_interrupt(int millisec) {
 	// configure TA0.1
     TA0CCTL0 |= CCIE;    // Capture/compare interrupt enable
-    TA0CCR0 = TIMER_MILLISEC * 1000 - 1; // overflow at X ms if 1MHz in
+    TA0CCR0 = myTA0CCR0; // overflow at X ms if 1MHz in
 
     // start Timer A
     TA0CTL  |= TASSEL_2 + // Timer A clock source select: 2 - SMCLK
@@ -308,15 +315,28 @@ void enqueue(int val)
     }
 }
 
-// circular buffer dequeue
-int dequeue(void) {
-    int result = 0;
+// circular buffer dequeue (FIFO)
+char dequeue() {
+    unsigned char result = 0;
     if (head == tail) { // buffer empty
         txUART(BUF_EMPTY_BYTE); // Error: buffer empty
     }
     else {
         result = buf[tail]; // dequeue
         tail = (tail + 1) % BUF_SIZE; // tail++;
+    }
+    return result;
+}
+
+// circular buffer dequeue (LIFO)
+char dequeue_LIFO() {
+    unsigned char result = 0;
+    if (head == tail) { // buffer empty
+        txUART(BUF_EMPTY_BYTE); // Error: buffer empty
+    }
+    else {
+        result = buf[head]; // dequeue
+        head = (head + BUF_SIZE - 1) % BUF_SIZE; // head--;
     }
     return result;
 }
@@ -329,80 +349,6 @@ void printBufUART()
     }
 }
 
-// [ex10] process message packet and execute commands
-void process_msg_packet() {
-    // loop over buffer contents
-    for (i = tail; i != head; i = (i + 1) % BUF_SIZE) {
-        while (!(UCA0IFG & UCTXIFG)); // wait until UART not transmitting
-        switch(byteState) {
-            case 0:
-                if (dequeuedItem == MSG_START_BYTE) byteState = 1;
-                break;
-            case 1:
-                cmdByte = dequeuedItem;
-                byteState = 2;
-                break;
-            case 2:
-                data_H_Byte = dequeuedItem;
-                byteState = 3;
-                break;
-            case 3:
-                data_L_Byte = dequeuedItem;
-                byteState = 4;
-                break;
-            case 4:
-                escByte = dequeuedItem;
-                byteState = 0;
-                // entire packet received, process packet
-
-                // revert modified data using escByte
-                switch(escByte) {
-                    case 0x01:
-                        data_L_Byte = MSG_START_BYTE;
-                        break;
-                    case 0x02:
-                        data_H_Byte = MSG_START_BYTE;
-                        break;
-                    case 0x03:
-                        data_L_Byte = MSG_START_BYTE;
-                        data_H_Byte = MSG_START_BYTE;
-                        break;
-                    default:
-                        break;
-                } // switch (escByte)
-
-                // combine data_H and data_L Bytes
-                data = data_H_Byte << 8 | data_L_Byte;
-
-                // execute commands
-                switch(cmdByte) {
-                    case FREQ_CMD_BYTE: // cmd 1: set Timer B CCR0 (period)
-                        TB1CCR0 = data;
-                        break;
-                    case LEDS_CMD_BYTE: // cmd 2: display data_L_Byte on LEDs
-                        byteDisplayLED(data_L_Byte);
-                        break;
-                    case DUTY_CMD_BYTE: // cmd 3: set Timer B CCR1 (duty cycle)
-                        TB1CCR1 = data;
-                        break;
-                    default:
-                        break;
-                } // switch (cmdByte)
-
-                // dequeue the processed message packet
-                dequeuedItem = dequeue();
-                dequeuedItem = dequeue();
-                dequeuedItem = dequeue();
-                dequeuedItem = dequeue();
-                dequeuedItem = dequeue();
-
-                break;
-            default:
-                break;
-        } // switch (byteState)
-    } // for loop over buf contents
-}
-
 /////////////////////////////////////////////////
 int main(void)
 {
@@ -412,6 +358,7 @@ int main(void)
 	setup_UART(UART_INT_EN);   // set up UART with UART RX interrupt enabled
 
 	setup_LEDs();
+	display_LEDs(LEDOUTPUT);   // initialize LEDs
 
 	// setup Timer B [ex5] to output PWM on P1.6 and P1.7
 	setup_timerB_UP_mode(~TIMERB_LED_PORT); // TB1.1 and TB1.2 on P1.6 and P1.7
@@ -429,7 +376,76 @@ int main(void)
     _EINT();         // enable global interrupt
 
     while(1) {
-        ;
+        // loop if there are any items in buffer
+        if (head != tail) { // if buffer not empty
+            dequeuedByte = dequeue(); // dequeue
+            txUART(dequeuedByte); //debug
+
+            // [ex10] detect and store msg packet
+            switch(byteState) {
+                case 1:
+                    cmdByte = dequeuedByte;
+                    byteState = 2;
+                    break;
+                case 2:
+                    data_H_Byte = dequeuedByte;
+                    byteState = 3;
+                    break;
+                case 3:
+                    data_L_Byte = dequeuedByte;
+                    byteState = 4;
+                    break;
+                case 4:
+                    escByte = dequeuedByte;
+                    byteState = 0;
+                    //packetReceivedFlag = 1; // entire packet received, process packet in main
+
+                    //printBufUART(); // print to UART for debug
+
+                    // revert modified data using escByte
+                    switch(escByte) {
+                        case 0x01:
+                            data_L_Byte = MSG_START_BYTE;
+                            break;
+                        case 0x02:
+                            data_H_Byte = MSG_START_BYTE;
+                            break;
+                        case 0x03:
+                            data_L_Byte = MSG_START_BYTE;
+                            data_H_Byte = MSG_START_BYTE;
+                            break;
+                        default:
+                            break;
+                    } // switch (escByte)
+
+                    // combine data_H and data_L Bytes
+                    data = data_H_Byte << 8 | data_L_Byte;
+
+                    // [ex10] execute commands
+                    switch(cmdByte) {
+                        case FREQ_CMD_BYTE: // cmd 1: set Timer B CCR0 (period)
+                            TB1CCR0 = data;
+                            break;
+                        case LEDS_CMD_BYTE: // cmd 2: display data_L_Byte on LEDs
+                            byteDisplayLED(data_L_Byte);
+                            break;
+                        case DUTY_CMD_BYTE: // cmd 3: set Timer B CCR1 (duty cycle)
+                            TB1CCR1 = data;
+                            break;
+                        default:
+                            break;
+                    } // switch (cmdByte)
+
+                    //packetReceivedFlag = 0;
+                    break;
+                default:
+                    if (dequeuedByte == MSG_START_BYTE) {
+                        //startByte = dequeuedByte;
+                        byteState = 1;
+                    }
+                    break;
+            } // switch (byteState)
+        } // if items in buffer
     } // infinite loop
 
     return 0;
@@ -507,17 +523,17 @@ __interrupt void UCA0RX_ISR()
 {
     rxByte = UCA0RXBUF; // get the received byte from UART RX buffer
 
-	// [ex9] circular buffer
-	if (rxByte == BUF_DQ_BYTE) { // dequeue if receive a carriage return (ASCII 13)
-		dequeuedItem = dequeue();
-	} 
-	else {
-		enqueue(rxByte);
-	}
-	printBufUART(); // debug
+    enqueue(rxByte); // [ex10]
 
-	// [ex10] process msg packet and execute commands
-	process_msg_packet();
+	//// [ex9] circular buffer
+	//if (rxByte == BUF_DQ_BYTE) { // dequeue if receive a carriage return (ASCII 13)
+	//	dequeuedItem = dequeue();
+	//}
+	//else {
+	//    enqueue(rxByte);
+	//}
+	//printBufUART(); // [ex9] debug
+
 
 	//// [ex4] echo rxByte, rxBtye + 1
     //// transmit back the received byte
