@@ -15,6 +15,33 @@ count number of elements in circular buffer
 ```
 echo "<serial_data_stream>" | wc -w
 ```
+## Ex 10 Commands
+FREQ_CMD_BYTE = 1
+LEDS_CMD_BYTE = 2
+DUTY_CMD_BYTE = 3
+
+ | MSG_START_BYTE | cmdByte       | data_H_Byte | data_L_Byte | escByte | data_modified |
+ |----------------|---------------|-------------|-------------|---------|---------------|
+ | 255            | FREQ_CMD_BYTE |             |             |         |               |
+ | 255            | LEDS_CMD_BYTE |             |             |         |               |
+ | 255            | DUTY_CMD_BYTE |             |             |         |               |
+ | 255            |               |             | 0x00        | 0x01    | 0x..FF        |
+ | 255            |               | 0x00        |             | 0x02    | 0xFF..        |
+ | 255            |               | 0x00        | 0x00        | 0x03    | 0xFFFF        |
+
+### Ex 10 Demo
+default: P1.6 500Hz, 50% duty cycle (CCR0 = 2000, CCR1 = 1000)
+default: LEDs all ON
+
+ | startByte | cmdByte  | data_H_Byte | data_L_Byte | escByte | LEDs/P1.6     | explanation |
+ |-----------|----------|-------------|-------------|---------|---------------|-------------|
+ | 255       | 2       	| 0           |   7         | 0       | 0000 0111     |             |
+ | 255       | 2       	| 0           | 170         | 0       | 1010 1010     |             |
+ | 255       | 1       	| 15          | 160         | 0       | 250Hz, 25%    | CCR0 = 4000 |
+ | 255       | 1       	|  7          | 207         | 0       | 500Hz, 50%    | CCR0 = 2000 |
+ | 255       | 3       	|  1          | 224         | 0       | 500Hz, 25%    | CCR1 =  500 |
+ | 255       | 3        |  5          | 220         | 0       | 500Hz, 75%    | CCR1 = 1500 |
+
 
 ## hard link to CCS workspace
 ```
