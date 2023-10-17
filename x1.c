@@ -1,7 +1,7 @@
 #include <msp430.h> 
 
 /**
- * main.c - ex5 for exam
+ * main.c - ex5 for exam -> q1
  *
  * [ex5] Timer B in UP mode, 1 MHz     (TB1CCR0 = 2000)
  * TB1.1  -> PWM 500 Hz 50% duty cycle (TB1CCR1 = 1000)
@@ -16,7 +16,7 @@
 // PARAMETERS
 #define LEDOUTPUT        0b00000001
 #define UART_CHAR0       'a'
-#define myTB1CCR0        2000
+#define myTB1CCR0        500
 // myTB1CCR0 = 1 MHz / PWM frequency (Hz)
 
 // CONSTANTS
@@ -26,8 +26,8 @@
 #define TIMERB_LED_PORT 0b1
 
 // VARIABLES (TO CHANGE)
-static const int myTB1CCR1 = 250; // = duty cycle * myTB1CCR0
-static const int myTB1CCR2 = 63;  // = duty cycle * myTB1CCR0
+static const int myTB1CCR1 = 125; // = duty cycle * myTB1CCR0
+static const int myTB1CCR2 = 31;  // = duty cycle * myTB1CCR0
 
 // VARIABLES (TO BE USED)
 volatile unsigned char rxByte = 0;
@@ -46,7 +46,7 @@ void setup_clocks() {
               SELS__DCOCLK ;    // DCO -> SMCLK
 }
 
-// [ex1] divide SMCLK by 32 
+// [ex1] divide SMCLK by 32
 void div_32_SMCLK() {
     CSCTL3 |= DIVS__32;
 }
@@ -113,7 +113,7 @@ void enable_buttons_interrupt() {
 // set up UART 9600 baud from 8MHz
 void setup_UART(int int_en) {
     P2SEL0 &= ~(BIT0 + BIT1); // UART ports P2.0 and P2.1 // redundant
-    P2SEL1 |=  (BIT0 + BIT1); // UART ports P2.0 and P2.1 
+    P2SEL1 |=  (BIT0 + BIT1); // UART ports P2.0 and P2.1
 
     UCA0CTLW0 |= UCSWRST;                   // Put the UART in software reset
     UCA0CTLW0 |= UCSSEL__ACLK;              // Run the UART using ACLK
@@ -224,3 +224,4 @@ __interrupt void UCA0RX_ISR()
 
     // UART RX IFG is self clearing
 }
+
