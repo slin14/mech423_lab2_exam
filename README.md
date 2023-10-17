@@ -84,3 +84,8 @@ env var pointing to code composer studio workspace
 ```
 export CCS=`pwd`
 ```
+
+x5 data = frequency
+cmd 1 = light to dark
+cmd 2 = dark to light
+cmd 4 = turn off P3.4
