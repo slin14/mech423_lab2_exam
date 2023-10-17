@@ -4,17 +4,14 @@
  * main.c - ex10 for exam
  *
  * [ex10] Process Message Packet (packet size = byte)
- * PC TX requirements: need MSG_SIZE=5 consecutive packets
- * freq reading on P1.6
+ * PC TX requirements: need MSG_SIZE=3 consecutive packets
+ * blink LED5 (freq reading on P3.4)
  *
- * | MSG_START_BYTE | cmdByte       | data_H_Byte | data_L_Byte | escByte | data_modified |
- * |----------------|---------------|-------------|-------------|---------|---------------|
- * | 255            | FREQ_CMD_BYTE |             |             |         |               |
- * | 255            | LEDS_CMD_BYTE |             |             |         |               |
- * | 255            | DUTY_CMD_BYTE |             |             |         |               |
- * | 255            |               |             | 0x00        | 0x01    | 0x..FF        |
- * | 255            |               | 0x00        |             | 0x02    | 0xFF..        |
- * | 255            |               | 0x00        | 0x00        | 0x03    | 0xFFFF        |
+ * | MSG_START_BYTE | cmdByte       | dataByte                    |
+ * |----------------|---------------|-----------------------------|
+ * | 255            | 1 light2dark  | frequency between 0 and 254 |
+ * | 255            | 2 dark2light  | frequency between 0 and 254 |
+ * | 255            | 4 OFF         | frequency between 0 and 254 |
  *
  * [ex9] Circular Buffer
  * enqueue over UART RX, dequeue if received "BUF_DQ_BYTE"
@@ -369,7 +366,7 @@ int main(void)
     TB1CCTL2 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
     TB1CCR2 = 0;
 
-    TB1CCTL0 |= CCIE; // enable interrupt for CCR0
+    TB1CCTL0 |= CCIE; // [x5] enable interrupt for CCR0
 
     //setup_buttons_input();
     //enable_buttons_interrupt();
