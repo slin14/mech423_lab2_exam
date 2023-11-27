@@ -4,7 +4,7 @@
  * main.c - final proj 1
  *
  * ADC read Ax, Ay, Az. Transmit over UART every 40 ms (25 Hz)
- * gesture detection
+ * simple gesture detection
  */
 
 // PARAMETERS
@@ -14,6 +14,8 @@
 #define myTB1CCR0        2000
 // milliseconds per timer interrupt (freq = 1000/TIMER_MILLISEC Hz) 
 #define TIMER_MILLISEC   40
+#define BUF_SIZE         50
+#define MSG_SIZE         5
 
 // CONSTANTS
 #define LOWMASK         0x0F
@@ -318,11 +320,25 @@ int main(void)
 	// timer interrupt every 40 ms (25 Hz)
 	timerA_interrupt(TIMER_MILLISEC); // TA0.1 interrupt every TIMER_MILLISEC
 
+	setup_LEDs();
+
     /////////////////////////////////////////////////
     _EINT();         // enable global interrupt
 
     while(1) {
 		;
+		if (axByte > (128 + 30)) {
+			PJOUT |=  BIT0; // ON
+			PJOUT &= ~BIT1;
+		}
+		else if (axByte < (128 - 30)) {
+			PJOUT &= ~BIT0;
+			PJOUT |=  BIT1; // ON
+		}
+		else {
+			PJOUT &= ~BIT0;
+			PJOUT &= ~BIT1;
+		}
     }
 
     return 0;
