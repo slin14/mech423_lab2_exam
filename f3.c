@@ -38,9 +38,8 @@ static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
 static const int myTA0CCR0 = 500;  // = TIMER_MILLISEC * 1000 - 1;
 volatile unsigned int data = 500;  // timer ISR freq [f] frequency of blink
 static const int COUNT_MAX = 5000;  // count expiry [f] blink length after accel is detected
-static const int A_THRESH = 30;
-static const int AY_THRESH = 50;
-static const int AZ_THRESH = 50;
+static const int TH1 = 30;  // threshold for Ax to be greater than Ax0
+static const int TH2 = 20; // threshold for dAx to be greater than dAy and dAz
 
 // VARIABLES (CONSTANTS)
 unsigned char datapacket = 255;
@@ -51,6 +50,9 @@ static const unsigned char MSG_START_BYTE = 255;
 static const unsigned char FREQ_CMD_BYTE = 0x01; // msg cmd
 static const unsigned char LEDS_CMD_BYTE = 0x02; // msg cmd
 static const unsigned char DUTY_CMD_BYTE = 0x03; // msg cmd
+static const int Ax0 = 128;  // at default orientation
+static const int Ay0 = 153;  // at default orientation
+static const int Az0 = 128;  // at default orientation
 
 // VARIABLES (TO BE USED)
 volatile unsigned char rxByte = 0;
@@ -349,13 +351,13 @@ int main(void)
 
     while(1) {
 		// Display Ax on LED 1 and 2
-		if ((axByte > (128 +  A_THRESH)) && (axByte > (ayByte + AY_THRESH)) && (axByte > (azByte + AZ_THRESH))) {
+		if ((axByte > Ax0+TH1) && (axByte-Ax0+TH2 > ayByte-Ay0) && (axByte-Ax0+TH2 > azByte-Az0)) { // (dAx > TH1) && (dAx > dAy) && (dAx > dAz)
 			PJOUT |=  BIT0; // ON
 			PJOUT &= ~BIT1;
 
 			blinkMode = 2;
 		}
-		else if ((axByte < (128 - A_THRESH)) && (axByte < (ayByte - AY_THRESH)) && (axByte < (azByte - AZ_THRESH))) {
+		else if ((axByte < Ax0 - TH1) && (axByte-Ax0-TH2 < ayByte-Ay0) && (axByte-Ax0-TH2 < axByte-Az0)) { // (dAx < TH1) && (dAx < dAy) && (dAx < dAz)
 			PJOUT &= ~BIT0;
 			PJOUT |=  BIT1; // ON
 
