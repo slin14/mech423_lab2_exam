@@ -373,33 +373,22 @@ int main(void)
 		TB1CCR0 = blinkFreq;
 		TB1CCR1 = brightness;
 		TB1CCR2 = brightness;
+		P3OUT  &= ~(BIT4 + BIT5);
 
         if (dark) {
-			P3SEL0 &= ~BIT4;
-			P3SEL0 &= ~BIT5;
-			P3OUT  &= ~BIT4;
-			P3OUT  &= ~BIT5;
+			P3SEL0 &= ~(BIT4 + BIT5);
 		}
 		else {
 		    if (blinkMode == 1) {
-		        //TB1CCR1 = brightness;
 		        P3SEL0 |=  BIT4;
 		        P3SEL0 &= ~BIT5;
-		        P3OUT  &= ~BIT4;
-		        P3OUT  &= ~BIT5;
 		    }
 		    else if (blinkMode == 2) {
-		        //TB1CCR2 = brightness;
 		        P3SEL0 &= ~BIT4;
 		        P3SEL0 |=  BIT5;
-		        P3OUT  &= ~BIT4;
-		        P3OUT  &= ~BIT5;
 		    }
 		    else {
-				P3SEL0 &= ~BIT4;
-				P3SEL0 &= ~BIT5;
-				P3OUT  &= ~BIT4;
-				P3OUT  &= ~BIT5;
+				P3SEL0 &= ~(BIT4 + BIT5);
 		    }
 		}
 
