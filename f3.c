@@ -82,6 +82,7 @@ volatile unsigned int  blinkMode = 0;
 volatile unsigned int  brightness = 0;
 volatile unsigned int  dark = 0;
 volatile unsigned int  count = 0;
+volatile unsigned int  autoMode = 1;
 
 /////////////////////////////////////////////////
 // FUNCTIONS
@@ -336,6 +337,9 @@ int main(void)
 
 	setup_LEDs(); // dev board LED 1 to 8
 
+	setup_buttons_input();
+	enable_buttons_interrupt();
+
 	setup_timerB_UP_mode(TIMERB_LED_PORT); // TB1.1 and TB1.2 on P1.6 and P1.7
 
     // initialize PWM outputs to default: 500 Hz, 50% duty TB1.1, 25% duty TB1.2
@@ -350,24 +354,26 @@ int main(void)
     _EINT();         // enable global interrupt
 
     while(1) {
-		// FSM states: blinkMode
-		if ((axByte > Ax0+TH1) && (axByte-Ax0+TH2 > ayByte-Ay0) && (axByte-Ax0+TH2 > azByte-Az0)) { // (dAx > TH1) && (dAx > dAy) && (dAx > dAz)
-			PJOUT |=  BIT0; // ON
-			PJOUT &= ~BIT1;
+		if (P3OUT & BIT7) { // autoMode is enabled
+			// FSM states: blinkMode
+			if ((axByte > Ax0+TH1) && (axByte-Ax0+TH2 > ayByte-Ay0) && (axByte-Ax0+TH2 > azByte-Az0)) { // (dAx > TH1) && (dAx > dAy) && (dAx > dAz)
+				PJOUT |=  BIT0; // ON
+				PJOUT &= ~BIT1;
 
-			blinkMode = 2;
-		}
-		else if ((axByte < Ax0 - TH1) && (axByte-Ax0-TH2 < ayByte-Ay0) && (axByte-Ax0-TH2 < axByte-Az0)) { // (dAx < TH1) && (dAx < dAy) && (dAx < dAz)
-			PJOUT &= ~BIT0;
-			PJOUT |=  BIT1; // ON
+				blinkMode = 2;
+			}
+			else if ((axByte < Ax0 - TH1) && (axByte-Ax0-TH2 < ayByte-Ay0) && (axByte-Ax0-TH2 < axByte-Az0)) { // (dAx < TH1) && (dAx < dAy) && (dAx < dAz)
+				PJOUT &= ~BIT0;
+				PJOUT |=  BIT1; // ON
 
-			blinkMode = 1;
-		}
-		else {
-			PJOUT &= ~BIT0;
-			PJOUT &= ~BIT1;
+				blinkMode = 1;
+			}
+			else {
+				PJOUT &= ~BIT0;
+				PJOUT &= ~BIT1;
 
-		}
+			}
+		} //if autoMode
 
 		// FSM output
 		TB1CCR0 = blinkFreq;
@@ -391,6 +397,7 @@ int main(void)
 				P3SEL0 &= ~(BIT4 + BIT5);
 		    }
 		}
+
 
 
 
@@ -466,13 +473,13 @@ __interrupt void P4_ISR()
 {
     switch (P4IV) {
         case P4IV_P4IFG0: // P4.0 (SW1)
-            toggle_LED_zeros(LEDOUTPUT);  // toggle the zeros in LEDOUTPUT
-          //turn_ON_LED_ones(LEDOUTPUT);  // turn ON the 1's in LEDOUTPUT
+			//if (autoMode == 1) autoMode = 0;
+			//else               autoMode = 1;
+			P3OUT ^= BIT7;
+			
             P4IFG &= ~BIT0; // clear IFG
             break;
         case P4IV_P4IFG1: // P4.1 (SW2)
-            toggle_LED_ones(LEDOUTPUT);   // toggle the ones in LEDOUTPUT
-          //turn_OFF_LED_ones(LEDOUTPUT); // turn OFF the 1's in LEDOUTPUT
             P4IFG &= ~BIT1; // clear IFG
             break;
         default: break;
