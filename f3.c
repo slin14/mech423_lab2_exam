@@ -36,7 +36,7 @@
 static const int myTB1CCR1 = 1000; // = duty cycle * myTB1CCR0
 static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
 static const int myTA0CCR0 = 500;  // = TIMER_MILLISEC * 1000 - 1;
-volatile unsigned int data = 500;  // timer ISR freq [f] frequency of blink
+volatile unsigned int blinkFreq = 500;  // timer ISR freq [f] frequency of blink
 static const int COUNT_MAX = 5000;  // count expiry [f] blink length after accel is detected
 static const int TH1 = 30;  // threshold for Ax to be greater than Ax0
 static const int TH2 = 20; // threshold for dAx to be greater than dAy and dAz
@@ -350,7 +350,7 @@ int main(void)
     _EINT();         // enable global interrupt
 
     while(1) {
-		// Display Ax on LED 1 and 2
+		// FSM states: blinkMode
 		if ((axByte > Ax0+TH1) && (axByte-Ax0+TH2 > ayByte-Ay0) && (axByte-Ax0+TH2 > azByte-Az0)) { // (dAx > TH1) && (dAx > dAy) && (dAx > dAz)
 			PJOUT |=  BIT0; // ON
 			PJOUT &= ~BIT1;
@@ -369,44 +369,37 @@ int main(void)
 
 		}
 
-		//// Display Ay on LED 3 and 4
-		//if (ayByte > (128 + 30)) {
-		//	PJOUT |=  BIT3; // ON
-		//	PJOUT &= ~BIT4;
-		//}
-		//else if (ayByte < (128 - 30)) {
-		//	PJOUT &= ~BIT3;
-		//	PJOUT |=  BIT4; // ON
-		//}
-		//else {
-		//	PJOUT &= ~BIT3;
-		//	PJOUT &= ~BIT4;
-		//}
-		//
+		// FSM output
+		TB1CCR0 = blinkFreq;
+		TB1CCR1 = brightness;
+		TB1CCR2 = brightness;
 
-		// test glowing orb on P3.4 LED 5
-		TB1CCR0 = data;
         if (dark) {
 			P3SEL0 &= ~BIT4;
+			P3SEL0 &= ~BIT5;
 			P3OUT  &= ~BIT4;
 			P3OUT  &= ~BIT5;
-			//TB1CCR1 = 0;
 		}
 		else {
 		    if (blinkMode == 1) {
-		        TB1CCR1 = brightness;
+		        //TB1CCR1 = brightness;
 		        P3SEL0 |=  BIT4;
 		        P3SEL0 &= ~BIT5;
+		        P3OUT  &= ~BIT4;
 		        P3OUT  &= ~BIT5;
 		    }
 		    else if (blinkMode == 2) {
-		        TB1CCR2 = brightness;
-		        P3SEL0 |=  BIT5;
+		        //TB1CCR2 = brightness;
 		        P3SEL0 &= ~BIT4;
+		        P3SEL0 |=  BIT5;
 		        P3OUT  &= ~BIT4;
+		        P3OUT  &= ~BIT5;
 		    }
 		    else {
-		        P3SEL0 |=  BIT4;
+				P3SEL0 &= ~BIT4;
+				P3SEL0 &= ~BIT5;
+				P3OUT  &= ~BIT4;
+				P3OUT  &= ~BIT5;
 		    }
 		}
 
@@ -442,29 +435,15 @@ __interrupt void timerA0()
 #pragma vector = TIMER1_B0_VECTOR
 __interrupt void tb0()
 {
-    if (blinkMode == 2) {
-        if (brightness == 0) {
-            brightness = data;
-            if (dark == 0) dark = 1;
-            else dark = 0;
-        }
-        else brightness--;
+	// glow dark to bright
+    if (brightness == blinkFreq) {
+        brightness = 0;
+        if (dark == 0) dark = 1;
+        else           dark = 0;
+    }
+    else brightness++;
 
-        count++;
-    }
-    else if (blinkMode == 1) {
-        if (brightness == data) {
-            brightness = 0;
-            if (dark == 0) dark = 1;
-            else dark = 0;
-        }
-        else brightness++;
-
-        count++;
-    }
-    else if (blinkMode == 0){
-        dark = 1;
-    }
+    count++;
 
     if (count > COUNT_MAX) { // count expired
         blinkMode = 0;
