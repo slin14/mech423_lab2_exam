@@ -5,6 +5,10 @@
  *
  * ADC read Ax, Ay, Az. Transmit over UART every 40 ms (25 Hz)
  * simple gesture detection
+ * blink light to dark for a brief amount of time for right acceleration
+ * blink dark to light for a brief amount of time for left acceleration
+ * otherwise dark
+ *
  */
 
 // PARAMETERS
@@ -34,6 +38,7 @@ static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
 static const int myTA0CCR0 = 500;  // = TIMER_MILLISEC * 1000 - 1;
 volatile unsigned int data = 500;  // timer ISR freq [f] frequency of blink
 static const int COUNT_MAX = 5000;  // count expiry [f] blink length after accel is detected
+static const int A_THRESH = 30;
 
 // VARIABLES (CONSTANTS)
 unsigned char datapacket = 255;
@@ -342,13 +347,13 @@ int main(void)
 
     while(1) {
 		// Display Ax on LED 1 and 2
-		if (axByte > (128 + 30)) {
+		if ((axByte > (128 +  A_THRESH)) && (axByte > (ayByte + A_THRESH))) {
 			PJOUT |=  BIT0; // ON
 			PJOUT &= ~BIT1;
 
 			blinkMode = 2;
 		}
-		else if (axByte < (128 - 30)) {
+		else if ((axByte < (128 - A_THRESH)) && (axByte < (ayByte - A_THRESH))) {
 			PJOUT &= ~BIT0;
 			PJOUT |=  BIT1; // ON
 
@@ -386,6 +391,8 @@ int main(void)
 			TB1CCR1 = brightness;
 			P3SEL0 |=  BIT4;
 		}
+
+
 
     }
 
