@@ -38,7 +38,7 @@ static const int myTB1CCR2 = 500;  // = duty cycle * myTB1CCR0
 static const int myTA0CCR0 = 500;  // = TIMER_MILLISEC * 1000 - 1;
 volatile unsigned int blinkFreq1 = 500;  // timer ISR freq for blinking arrows
 volatile unsigned int blinkFreq2 = 300;  // timer ISR freq for blinking finger
-static const int COUNT_MAX = 5000;  // count expiry [f] blink length after accel is detected
+static const int COUNT_MAX = 5500;  // count expiry [f] blink length after accel is detected
 static const int TH1 = 30;  // threshold for Ax to be greater than Ax0
 static const int TH2 = 20; // threshold for dAx to be greater than dAy and dAz
 
@@ -87,6 +87,7 @@ volatile unsigned int  dark2 = 0;
 volatile unsigned int  count1 = 0;
 volatile unsigned int  count2 = 0;
 volatile unsigned int  autoMode = 1;
+volatile unsigned int  finger = 0;
 
 /////////////////////////////////////////////////
 // FUNCTIONS
@@ -366,22 +367,32 @@ int main(void)
     TB1CCR1 = myTB1CCR1;
     TB1CCTL2 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
     TB1CCR2 = myTB1CCR1;
+    TB2CCTL1 |= OUTMOD_7;    // OUTMOD 7 = reset/set (reset at CCRx, set at CCR0)
 
     TB1CCTL0 |= CCIE; // [x5] enable interrupt for CCR0
+    //TB2CCTL0 |= CCIE; // [x5] enable interrupt for CCR0
+
+
+	// housekeeping settings
+	TB1CCR0 = blinkFreq1;
+	P3OUT  &= ~(BIT4 + BIT5);
+	// for finger:
+	TB2CCR0 = blinkFreq2;
+	P3OUT  &= ~(BIT6);
+	TB2CCR1 = blinkFreq2;
 
     /////////////////////////////////////////////////
     _EINT();         // enable global interrupt
 
     while(1) {
-		// process switch commands
-		if (P2OUT & BIT0) P3OUT |=  BIT7; // turn ON LED to indicate autoMode enabled
-		else              P3OUT &= ~BIT7; // turn OFF LED to indicate autoMode disabled
+		//if (P2OUT & BIT0) P3OUT |=  BIT7; // turn ON LED to indicate autoMode enabled
+		//else              P3OUT &= ~BIT7; // turn OFF LED to indicate autoMode disabled
 
-		//if (P2OUT & BIT1) blinkMode = 3;  // flash finger
-
-
-    	/////////////////////////////////////////////////
-		if (P3OUT & BIT7) { // autoMode is enabled
+		if (finger == 1) { // flash finger
+		    blinkMode = 3;
+		    finger = 0;
+		}
+		else if (P3OUT & BIT7) { // autoMode is enabled
 			// FSM states: blinkMode
 			if ((axByte > Ax0+TH1) && (axByte-Ax0+TH2 > ayByte-Ay0) && (axByte-Ax0+TH2 > azByte-Az0)) { // (dAx > TH1) && (dAx > dAy) && (dAx > dAz)
 				PJOUT |=  BIT0; // ON
@@ -405,15 +416,9 @@ int main(void)
     	/////////////////////////////////////////////////
 		// FSM output
 		// for arrows:
-		TB1CCR0 = blinkFreq1;
 		TB1CCR1 = brightness1;
 		TB1CCR2 = brightness1;
-		P3OUT  &= ~(BIT4 + BIT5);
 
-		// for finger:
-		TB2CCR0 = blinkFreq2;
-		TB2CCR1 = brightness2;
-		P3OUT  &= ~(BIT6);
 
 		//else if (dark2) {
 		//	P3SEL0 &= ~(BIT6);
@@ -436,9 +441,10 @@ int main(void)
 		    P3SEL0 &= ~BIT6;
 		}
 		else if (blinkMode == 3) {
+		    if (dark2) P3SEL0 &= ~BIT6;
+            else       P3SEL0 |=  BIT6;
 		    P3SEL0 &= ~BIT4;
 		    P3SEL0 &= ~BIT5;
-		    P3SEL0 |=  BIT6;
 		}
 		else {
 			P3SEL0 &= ~(BIT4 + BIT5);
@@ -475,11 +481,11 @@ __interrupt void timerA0()
 #pragma vector = TIMER1_B0_VECTOR
 __interrupt void tb1_ccr0()
 {
-	// glow dark to bright
+	// glow arrows from dark to bright
     if (brightness1 == blinkFreq1) {
         brightness1 = 0;
         if (dark1 == 0) dark1 = 1;
-        else           dark1 = 0;
+        else            dark1 = 0;
     }
     else brightness1++;
 
@@ -489,6 +495,14 @@ __interrupt void tb1_ccr0()
         blinkMode = 0;
         count1 = 0;
     }
+
+    // blink finger
+    if (brightness2 == blinkFreq2) {
+        brightness2 = 0;
+        if (dark2 == 0) dark2 = 1;
+        else            dark2 = 0;
+    }
+    else brightness2++;
 
     TB1CCTL0 &= ~CCIFG;
 }
@@ -500,16 +514,16 @@ __interrupt void tb2_ccr0()
     if (brightness2 == blinkFreq2) {
         brightness2 = 0;
         if (dark2 == 0) dark2 = 1;
-        else           dark2 = 0;
+        else            dark2 = 0;
     }
     else brightness2++;
 
-    count2++;
+    //count2++;
 
-    if (count2 > COUNT_MAX) { // count expired
-        blinkMode = 0;
-        count2 = 0;
-    }
+    //if (count2 > COUNT_MAX) { // count expired
+    //    blinkMode = 0;
+    //    count2 = 0;
+    //}
 
     TB2CCTL0 &= ~CCIFG;
 }
@@ -541,13 +555,14 @@ __interrupt void P4_ISR()
         case P4IV_P4IFG0: // P4.0 (SW1)
 			//if (autoMode == 1) autoMode = 0;
 			//else               autoMode = 1;
-			P2OUT ^= BIT0;
+			//P2OUT ^= BIT0;
+            P3OUT ^= BIT7;
 			
             P4IFG &= ~BIT0; // clear IFG
             break;
         case P4IV_P4IFG1: // P4.1 (SW2)
 
-			P2OUT ^= BIT1;
+			finger = 1;
 
             P4IFG &= ~BIT1; // clear IFG
             break;
