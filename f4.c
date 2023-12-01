@@ -377,7 +377,7 @@ int main(void)
 		if (P2OUT & BIT0) P3OUT |=  BIT7; // turn ON LED to indicate autoMode enabled
 		else              P3OUT &= ~BIT7; // turn OFF LED to indicate autoMode disabled
 
-		//if (P2OUT & BIT1) blinkMode = 3;  // flash finger
+		if (P2OUT & BIT1) blinkMode = 3;  // flash finger
 
 
     	/////////////////////////////////////////////////
@@ -415,35 +415,36 @@ int main(void)
 		TB2CCR1 = brightness2;
 		P3OUT  &= ~(BIT6);
 
-		//else if (dark2) {
-		//	P3SEL0 &= ~(BIT6);
-		//}
-
-		if (blinkMode == 1) {
-			if (dark1) P3SEL0 &= ~(BIT4 + BIT5);
-			else {
-		    	P3SEL0 |=  BIT4;
-		    	P3SEL0 &= ~BIT5;
-			}
-		    P3SEL0 &= ~BIT6;
-		}
-		else if (blinkMode == 2) {
-			if (dark1) P3SEL0 &= ~(BIT4 + BIT5);
-			else {
-		    	P3SEL0 &= ~BIT4;
-		    	P3SEL0 |=  BIT5;
-			}
-		    P3SEL0 &= ~BIT6;
-		}
-		else if (blinkMode == 3) {
-		    P3SEL0 &= ~BIT4;
-		    P3SEL0 &= ~BIT5;
-		    P3SEL0 |=  BIT6;
-		}
-		else {
+        if (dark1) {
 			P3SEL0 &= ~(BIT4 + BIT5);
+		}
+		else if (dark2) {
 			P3SEL0 &= ~(BIT6);
 		}
+		else {
+		    if (blinkMode == 1) {
+		        P3SEL0 |=  BIT4;
+		        P3SEL0 &= ~BIT5;
+		        P3SEL0 &= ~BIT6;
+		    }
+		    else if (blinkMode == 2) {
+		        P3SEL0 &= ~BIT4;
+		        P3SEL0 |=  BIT5;
+		        P3SEL0 &= ~BIT6;
+		    }
+		    else if (blinkMode == 3) {
+		        P3SEL0 &= ~BIT4;
+		        P3SEL0 &= ~BIT5;
+		        P3SEL0 |=  BIT6;
+			}
+		    else {
+				P3SEL0 &= ~(BIT4 + BIT5);
+				P3SEL0 &= ~(BIT6);
+		    }
+		}
+
+
+
 
     }
 
